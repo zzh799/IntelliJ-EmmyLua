@@ -1,5 +1,6 @@
 ![logo](/snapshot/logo.png)
-# EmmyLua for IntelliJ IDEA
+# EmmyLua for IntelliJ IDEA (Modified to support Rider)
+修改了源码，以支持rider进行require提示
 
 [![Build status](https://ci.appveyor.com/api/projects/status/m25uajpqa2fft8ah?svg=true)](https://ci.appveyor.com/project/EmmyLua/intellij-emmylua)
 [![Online EmmyLua Doc](https://img.shields.io/badge/emmy-doc-46BC99.svg?style=flat-square)](https://emmylua.github.io)
