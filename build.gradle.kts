@@ -19,7 +19,7 @@ import org.apache.tools.ant.taskdefs.condition.Os
 import java.io.ByteArrayOutputStream
 
 plugins {
-    id("org.jetbrains.intellij").version("1.3.0")
+    id("org.jetbrains.intellij").version("1.4.0")
     id("org.jetbrains.kotlin.jvm").version("1.4.20")
     id("de.undercouch.download").version("3.4.3")
 }
@@ -215,12 +215,22 @@ project(":") {
         main {
             java.srcDirs("gen", "src/main/compat")
             resources.exclude("debugger/**")
+            resources.exclude("std/**")
         }
     }
 
     configure<JavaPluginConvention> {
         sourceCompatibility = buildVersionData.targetCompatibilityLevel
         targetCompatibility = buildVersionData.targetCompatibilityLevel
+    }
+
+    intellij {
+        type.set("IU")
+        updateSinceUntilBuild.set(false)
+        downloadSources.set(false)
+        version.set(buildVersionData.ideaSDKVersion)
+        localPath.set(System.getenv("IDEA_HOME_${buildVersionData.ideaSDKShortVersion}"))
+        sandboxDir.set("${project.buildDir}/${buildVersionData.ideaSDKShortVersion}/idea-sandbox")
     }
 
     task("bunch") {
@@ -253,9 +263,6 @@ project(":") {
         buildPlugin {
             dependsOn("bunch", "installEmmyDebugger")
             archiveBaseName.set(buildVersionData.archiveName)
-            from(fileTree(resDir) { include("debugger/**") }) {
-                into("/${project.name}/classes/")
-            }
             from(fileTree(resDir) { include("!!DONT_UNZIP_ME!!.txt") }) {
                 into("/${project.name}")
             }
@@ -275,14 +282,18 @@ project(":") {
         instrumentCode {
             compilerVersion.set(buildVersionData.instrumentCodeCompilerVersion)
         }
-    }
 
-    intellij {
-        type.set("IU")
-        updateSinceUntilBuild.set(false)
-        downloadSources.set(false)
-        version.set(buildVersionData.ideaSDKVersion)
-        localPath.set(System.getenv("IDEA_HOME_${buildVersionData.ideaSDKShortVersion}"))
-        sandboxDir.set("${project.buildDir}/${buildVersionData.ideaSDKShortVersion}/idea-sandbox")
+        withType<org.jetbrains.intellij.tasks.PrepareSandboxTask> {
+            doLast {
+                copy {
+                    from("src/main/resources/std")
+                    into("$destinationDir/${pluginName.get()}/std")
+                }
+                copy {
+                    from("src/main/resources/debugger")
+                    into("$destinationDir/${pluginName.get()}/debugger")
+                }
+            }
+        }
     }
 }
