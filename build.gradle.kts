@@ -19,8 +19,8 @@ import org.apache.tools.ant.taskdefs.condition.Os
 import java.io.ByteArrayOutputStream
 
 plugins {
-    id("org.jetbrains.intellij").version("1.4.0")
-    id("org.jetbrains.kotlin.jvm").version("1.4.20")
+    id("org.jetbrains.intellij").version("1.5.3")
+    id("org.jetbrains.kotlin.jvm").version("1.6.0")
     id("de.undercouch.download").version("3.4.3")
 }
 
@@ -41,15 +41,15 @@ data class BuildData(
 
 val buildDataList = listOf(
     BuildData(
-        ideaSDKShortVersion = "213",
-        ideaSDKVersion = "213.5744.223",
+        ideaSDKShortVersion = "222",
+        ideaSDKVersion = "2022.2",
         sinceBuild = "212",
-        untilBuild = "213.*",
+        untilBuild = "222.*",
         bunch = "212"
     ),
     BuildData(
         ideaSDKShortVersion = "211",
-        ideaSDKVersion = "211.7142.45",
+        ideaSDKVersion = "2021.1",
         sinceBuild = "211",
         untilBuild = "211.*",
         bunch = "203"
@@ -117,19 +117,17 @@ val buildVersion = System.getProperty("IDEA_VER") ?: buildDataList.first().ideaS
 
 val buildVersionData = buildDataList.find { it.ideaSDKShortVersion == buildVersion }!!
 
-val emmyDebuggerVersion = "1.0.16"
+val emmyDebuggerVersion = "1.2.9"
 
 val resDir = "src/main/resources"
 
 val isWin = Os.isFamily(Os.FAMILY_WINDOWS)
 
-val isCI = System.getenv("APPVEYOR") != null
+val isCI = System.getenv("CI") != null
 
 // CI
 if (isCI) {
-    version =
-        System.getenv("APPVEYOR_REPO_TAG_NAME") ?:
-        System.getenv("APPVEYOR_BUILD_VERSION")
+    version = System.getenv("CI_BUILD_VERSION")
     exec {
         executable = "git"
         args("config", "--global", "user.email", "love.tangzx@qq.com")
@@ -154,10 +152,11 @@ fun getRev(): String {
 
 task("downloadEmmyDebugger", type = Download::class) {
     src(arrayOf(
-        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/emmy_core.so",
-        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/emmy_core.dylib",
-        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/emmy_core@x64.zip",
-        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/emmy_core@x86.zip"
+        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/darwin-arm64.zip",
+        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/darwin-x64.zip",
+        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/linux-x64.zip",
+        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/win32-x64.zip",
+        "https://github.com/EmmyLua/EmmyLuaDebugger/releases/download/${emmyDebuggerVersion}/win32-x86.zip"
     ))
 
     dest("temp")
@@ -165,32 +164,45 @@ task("downloadEmmyDebugger", type = Download::class) {
 
 task("unzipEmmyDebugger", type = Copy::class) {
     dependsOn("downloadEmmyDebugger")
-    from(zipTree("temp/emmy_core@x64.zip")) {
-        into("x64")
+    from(zipTree("temp/win32-x86.zip")) {
+        into("windows/x86")
     }
-    from(zipTree("temp/emmy_core@x86.zip")) {
-        into("x86")
+    from(zipTree("temp/win32-x64.zip")) {
+        into("windows/x64")
+    }
+    from(zipTree("temp/darwin-x64.zip")) {
+        into("mac/x64")
+    }
+    from(zipTree("temp/darwin-arm64.zip")) {
+        into("mac/arm64")
+    }
+    from(zipTree("temp/linux-x64.zip")) {
+        into("linux")
     }
     destinationDir = file("temp")
 }
 
 task("installEmmyDebugger", type = Copy::class) {
     dependsOn("unzipEmmyDebugger")
-    from("temp/x64/") {
+    from("temp/windows/x64/") {
         include("emmy_core.dll")
         into("debugger/emmy/windows/x64")
     }
-    from("temp/x86/") {
+    from("temp/windows/x86/") {
         include("emmy_core.dll")
         into("debugger/emmy/windows/x86")
     }
-    from("temp") {
+    from("temp/linux/") {
         include("emmy_core.so")
         into("debugger/emmy/linux")
     }
-    from("temp") {
+    from("temp/mac/x64") {
         include("emmy_core.dylib")
-        into("debugger/emmy/mac")
+        into("debugger/emmy/mac/x64")
+    }
+    from("temp/mac/arm64") {
+        include("emmy_core.dylib")
+        into("debugger/emmy/mac/arm64")
     }
     destinationDir = file("src/main/resources")
 }
@@ -281,6 +293,10 @@ project(":") {
 
         instrumentCode {
             compilerVersion.set(buildVersionData.instrumentCodeCompilerVersion)
+        }
+
+        publishPlugin {
+            token.set(System.getenv("IDEA_PUBLISH_TOKEN"))
         }
 
         withType<org.jetbrains.intellij.tasks.PrepareSandboxTask> {
